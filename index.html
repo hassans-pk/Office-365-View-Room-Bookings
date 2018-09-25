@@ -1,0 +1,146 @@
+<!-- AUTHOR - HASSAN TAHIR -->
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+            <meta http-equiv="X-UA-Compatible" content="IE=edge">
+                <title>O365 Rooms</title>
+                <link href="bootstrap.min.css" rel="stylesheet" />
+                <link href="bootstrap-theme.min.css" rel="stylesheet">
+                <script src="jquery-2.2.3.min.js"></script>
+                <script src="bootstrap.min.js"></script>
+    </head>
+    <body>
+        <div class="container main-container">
+            <div id="rooms" class=" page panel panel-primary">
+                <div class="panel-heading "><h4>Rooms Schedule</h4></div>
+                <div class="panel-body">
+                    <form>
+                        <div class="row col-lg-12">
+                            <div class="col col-sm-4">
+                                <input type="date" class="form-control" id="selDate"  placeholder="Date">
+                            </div>
+                            <div class="col col-sm-6 hidden-print">
+                                <input type="button" class="btn btn-primary" id="loadCalendar" value="Go" >
+                                <input type="button" class="btn btn-default" id="todayDate" value="Today" >
+                                <input type="button" class="btn btn-default" value="Print" onClick=window.print();>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="list-group" id="rooms-list"></div>
+            </div>
+        </div>
+    </body>
+    
+<script>
+
+//List of all the rooms with their name and email address
+//If there is new room defined in O365, Please add it in the array here.
+roomListArray = new Array(["ROOM 1 Name","room 1 email address"],
+                          ["ROOM 2 Name","room 2 email address"],
+                          ["ROOM 3 Name","room 3 email address"]
+                          );
+
+function formatDate(datetime, isAMPM) {
+    // This Function formats the date as AM PM to display in the page or format it to be used for outlook webservice
+     var date = new Date(datetime);
+     if (isAMPM )
+        return date.toLocaleString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true });
+     else
+     {
+         // Prepare the date for webservice by converting the date to GMT
+       return date.toLocaleString('en-US',{year:'numeric',timeZone: 'GMT'}) + "-" + date.toLocaleString('en-US',{month:'numeric',timeZone: 'GMT'}) + "-" + date.toLocaleString('en-US',{day:'numeric',timeZone: 'GMT'}) + "T" + date.toLocaleString('en-US',{hour:'numeric',hour12: false,timeZone: 'GMT'}) +":"+ date.toLocaleString('en-US',{minute:'numeric',timeZone: 'GMT'}).padStart(2,"0") + ":"+ date.toLocaleString('en-US',{second:'numeric',timeZone: 'GMT'}).padStart(2,"0");
+     }
+
+}
+
+
+function getCalendar(dt, roomName, roomEmailAddress){
+    
+    var eventStartDateTime = formatDate(new Date(dt + ' 00:00:01').toUTCString(),false);
+    var eventEndDateTime = formatDate(new Date(dt + ' 23:59:59').toUTCString(),false);
+
+    var xmlhttp = new XMLHttpRequest();
+    xmlhttp.onreadystatechange = function() {
+    if (this.readyState == 4 && this.status == 200) {
+        var myObj = JSON.parse(this.responseText);
+
+                if (! myObj.error){ // If User has Calendar access and there is no error returned
+                    
+                    if (parseInt(myObj.value.length) > 0)
+                    {
+                        // If The Calendar Data is not Empty
+                        
+                    tableHeader = "<table width='100%' border=1 style='border-left:0px;border-right:0px;font-size:.75em'>"
+                    + "<tr style='border-bottom:0px;border-right:0px;border-left:0px;'>"
+                    + "<td width='140' colspan = '3' style='padding: 2px 2px 2px 5px; border-right:0px;border-left:0px;background-color:#eee;' >"
+                    + "<Strong>" + roomName + "</Strong></td></tr>";
+                    
+                   var tableRow = " ";
+                   
+                   for (k=0;k<myObj.value.length;k++)
+                    {
+                        if (myObj.value[k]["IsAllDay"] == true) {
+                            meetingDuration = "All Day";
+                        }
+                        else
+                        {
+                            meetingDuration = formatDate(myObj.value[k]["Start"],true) + " - " + formatDate(myObj.value[k]["End"],true);
+                        }
+
+                        tableRow = tableRow +
+                        "<tr style='border-bottom:0px;border-right:0px;border-left:0px;'><td width='140' style='padding: 2px 0px 2px 20px; border-right:0px;border-left:0px;' >" + meetingDuration + "</td><td  style=' border-right:0px;border-left:0px;'>" +  myObj.value[k]["Subject"] + "</td><td width='200' style='padding: 5px; border-right:0px;border-left:0px;'><i>Host: " + ((myObj.value[k]["Organizer"])["EmailAddress"])["Name"] + "</i></td></tr>";
+                        
+                    }
+                    document.getElementById("rooms-list").innerHTML = document.getElementById("rooms-list").innerHTML + tableHeader + tableRow + "</table>";
+                    }
+                    }
+                }
+            };
+        xmlhttp.open("GET", "getRooms.php?sdt=" + eventStartDateTime + "&edt=" + eventEndDateTime + "&roomEmailAddress=" + roomEmailAddress, true);
+        xmlhttp.send();
+}
+
+
+function getAllCalendars()
+{
+    document.getElementById("rooms-list").innerHTML = "";
+    // Run through all the rooms and get the data
+    for (i=0;i<roomListArray.length;i++)
+    {
+        // roomListArray[i][0] = Room Name
+        // roomListArray[i][1] = Room Email Address
+        getCalendar(document.getElementById("selDate").value,roomListArray[i][0], roomListArray[i][1]);
+    }
+}
+
+function setTodayDate()
+{
+    d = new Date();
+    m = d.getMonth()+1 + "" ; //converts to string
+    m = m.padStart(2,"0");    // padding with 0 to keep 2 character month i.e. 01,02,11,12 etc.
+    dd= d.getDate() + "";     //converts to string
+    dd = dd.padStart(2,"0");  // padding with 0 to keep 2 character day i.e. 01,02,30,31 etc.
+    document.getElementById("selDate").value=d.getFullYear() + "-" + m + "-" + dd;
+}
+
+
+$("#todayDate").click(function(){
+    setTodayDate();
+    getAllCalendars();
+});
+
+$("#selDate").change(function(){
+    $("#rooms-list").html("<div class='alert alert-warning col-lg-8'> Click <strong>Go</strong> to Load Data.</div>");
+});
+
+$("#loadCalendar").click(function(){
+    getAllCalendars();
+});
+
+setTodayDate();
+getAllCalendars();
+
+</script>
+</html>
